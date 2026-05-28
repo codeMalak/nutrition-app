@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@zxing/browser": "^0.1.5",
+    "react-qr-barcode-scanner": "^2.1.23"
+  },
+  "devDependencies": {
+    "vite-plugin-mkcert": "^1.17.10"
+  }
+}
