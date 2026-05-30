@@ -5,47 +5,46 @@ const router = express.Router();
 
 router.get("/barcode/:code", async (req, res) => {
   try {
-
     const barcode = req.params.code;
 
-    const response = await axios.get(
-      `https://api.nal.usda.gov/fdc/v1/foods/search`,
-      {
-        params: {
-          api_key: process.env.USDA_API_KEY,
-          query: barcode
-        }
-      }
-    );
+    const response = await axios.get("https://api.nal.usda.gov/fdc/v1/foods/search", {
+      params: {
+        api_key: process.env.USDA_API_KEY,
+        query: barcode,
+        dataType: "Branded",
+        pageSize: 1,
+      },
+    });
 
-    const food = response.data.foods[0];
+    const food = response.data.foods?.[0];
 
     if (!food) {
       return res.status(404).json({ error: "Food not found" });
     }
 
-    let calories = 0;
-    let protein = 0;
-    let fats = 0;
-    let carbs = 0;
+    let calories = 0, protein = 0, fats = 0, carbs = 0;
 
-    food.foodNutrients.forEach(n => {
-      if (n.nutrientName === "Energy") calories = n.value;
-      if (n.nutrientName === "Protein") protein = n.value;
-      if (n.nutrientName === "Total lipid (fat)") fats = n.value;
-      if (n.nutrientName === "Carbohydrate, by difference") carbs = n.value;
+    (food.foodNutrients || []).forEach((n) => {
+      const name = n.nutrientName || n.nutrient?.name || "";
+      const value = n.value ?? n.amount ?? 0;
+      if (name === "Energy") calories = value;
+      if (name === "Protein") protein = value;
+      if (name === "Total lipid (fat)") fats = value;
+      if (name === "Carbohydrate, by difference") carbs = value;
     });
 
     res.json({
-      name: food.description,
+      name: food.description || "Unknown Product",
+      brand: food.brandOwner || food.brandName || null,
       calories,
       protein,
       fats,
-      carbs
+      carbs,
+      servingSize: food.servingSize || 100,
+      servingUnit: food.servingSizeUnit || "g",
     });
-
   } catch (err) {
-    console.error(err);
+    console.error("Barcode lookup error:", err.message);
     res.status(500).json({ error: "Barcode lookup failed" });
   }
 });
