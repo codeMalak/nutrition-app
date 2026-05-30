@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Sun, Moon } from "lucide-react";
 import DesktopTabBar from "./DesktopTabBar";
+import NutriIcon from "./NutriIcon";
 
 function formatDisplay(dateStr) {
   const today = new Date().toISOString().slice(0, 10);
@@ -41,9 +42,7 @@ export default function Navbar({
         <div className="flex items-center justify-between gap-3">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-sm">
-              <span className="text-sm">🥗</span>
-            </div>
+            <NutriIcon size={32} className="shadow-sm" />
             <div>
               <h1 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 leading-none">
                 NutriTrack

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 import { Loader2 } from "lucide-react";
+import NutriIcon from "../components/NutriIcon";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -39,9 +40,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-[360px]">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40 mb-4">
-            <span className="text-2xl">🥗</span>
-          </div>
+          <NutriIcon size={56} className="shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40 mb-4" />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Create account</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Start tracking your nutrition today
