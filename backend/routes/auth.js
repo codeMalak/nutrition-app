@@ -17,27 +17,39 @@ function createTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    connectionTimeout: 6000,
+    greetingTimeout: 6000,
+    socketTimeout: 10000,
   });
 }
 
 async function sendVerificationEmail(email, token) {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
+
+  // Always log the link so the server console works as a fallback
+  console.log(`[VERIFY] Link for ${email}: ${verifyUrl}`);
+
   const transporter = createTransporter();
-  await transporter.sendMail({
-    from: `"NutriTrack" <${process.env.SMTP_USER}>`,
-    to: email,
-    subject: "Verify your NutriTrack account",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-        <h2 style="color:#4f46e5;margin-bottom:8px">Welcome to NutriTrack!</h2>
-        <p style="color:#374151;margin-bottom:24px">Click the button below to verify your email address. The link expires in 24 hours.</p>
-        <a href="${verifyUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px">
-          Verify Email
-        </a>
-        <p style="color:#9ca3af;font-size:13px;margin-top:24px">If you didn't create a NutriTrack account you can safely ignore this email.</p>
-      </div>
-    `,
-  });
+  await Promise.race([
+    transporter.sendMail({
+      from: `"NutriTrack" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Verify your NutriTrack account",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#4f46e5;margin-bottom:8px">Welcome to NutriTrack!</h2>
+          <p style="color:#374151;margin-bottom:24px">Click the button below to verify your email address. The link expires in 24 hours.</p>
+          <a href="${verifyUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px">
+            Verify Email
+          </a>
+          <p style="color:#9ca3af;font-size:13px;margin-top:24px">If you didn't create a NutriTrack account you can safely ignore this email.</p>
+        </div>
+      `,
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Email timed out after 10s")), 10000)
+    ),
+  ]);
 }
 
 router.post("/register", async (req, res) => {
@@ -55,18 +67,12 @@ router.post("/register", async (req, res) => {
       emailVerificationExpires: expires,
     });
 
-    let emailError = null;
-    try {
-      await sendVerificationEmail(email, verificationToken);
-    } catch (emailErr) {
-      console.error("Verification email failed:", emailErr.message);
-      emailError = emailErr.message;
-    }
-
-    res.json({
-      message: "Account created. Please check your email to verify your account.",
-      emailError: emailError || undefined,
+    // Fire email but don't let it block or hang the response
+    sendVerificationEmail(email, verificationToken).catch((err) => {
+      console.error(`[EMAIL ERROR] ${err.message}`);
     });
+
+    res.json({ message: "Account created. Please check your email to verify your account." });
   } catch (err) {
     res.status(400).json({ error: "User already exists" });
   }
@@ -108,8 +114,11 @@ router.post("/resend-verification", async (req, res) => {
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
 
-    await sendVerificationEmail(email, verificationToken);
-    res.json({ message: "Verification email resent." });
+    sendVerificationEmail(email, verificationToken).catch((err) => {
+      console.error(`[EMAIL ERROR] ${err.message}`);
+    });
+
+    res.json({ message: "Verification email resent. Check your spam folder too." });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -125,7 +134,7 @@ router.post("/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Only block users who explicitly haven't verified (existing users have emailVerified=undefined)
+    // Only block users explicitly unverified (existing pre-feature accounts have emailVerified=undefined)
     if (user.emailVerified === false) {
       return res.status(403).json({
         error: "Please verify your email before logging in.",
