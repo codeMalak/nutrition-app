@@ -15,6 +15,8 @@ import FoodSearch from "../components/FoodSearch";
 import CalorieRing from "../components/CalorieRing";
 import MacroBar from "../components/MacroBar";
 import MealSection from "../components/MealSection";
+import EditFoodModal from "../components/EditFoodModal";
+import AdBanner from "../components/AdBanner";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -37,22 +39,15 @@ export default function DashboardPage({ toggleDark, darkMode }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [weeklyData, setWeeklyData] = useState([]);
   const [newFood, setNewFood] = useState({
-    name: "",
-    calories: "",
-    protein: "",
-    fats: "",
-    carbs: "",
-    mealType: "snacks",
+    name: "", calories: "", protein: "", fats: "", carbs: "", mealType: "snacks",
   });
   const [editingGoals, setEditingGoals] = useState({
-    dailyCalorieGoal: 2000,
-    protein: 150,
-    fats: 70,
-    carbs: 200,
+    dailyCalorieGoal: 2000, protein: 150, fats: 70, carbs: 200,
   });
   const [goalsSaved, setGoalsSaved] = useState(false);
   const [activeMealType, setActiveMealType] = useState("snacks");
   const [water, setWater] = useState(0);
+  const [editingEntry, setEditingEntry] = useState(null);
   const WATER_GOAL = 8;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -139,6 +134,16 @@ export default function DashboardPage({ toggleDark, darkMode }) {
     try {
       await api.deleteFoodEntry(id);
       await fetchFood();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditSave = async (id, form) => {
+    try {
+      await api.updateFoodEntry(id, form);
+      await fetchFood();
+      setEditingEntry(null);
     } catch (err) {
       console.error(err);
     }
@@ -248,8 +253,6 @@ export default function DashboardPage({ toggleDark, darkMode }) {
     },
   };
 
-  // ── Input class helpers ────────────────────────────────────────────────────
-
   const inputCls =
     "w-full border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500";
 
@@ -266,6 +269,15 @@ export default function DashboardPage({ toggleDark, darkMode }) {
         toggleDark={toggleDark}
         darkMode={darkMode}
       />
+
+      {/* Edit food entry modal */}
+      {editingEntry && (
+        <EditFoodModal
+          entry={editingEntry}
+          onSave={handleEditSave}
+          onClose={() => setEditingEntry(null)}
+        />
+      )}
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-28 md:pb-10">
 
@@ -292,6 +304,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                 </div>
               </div>
             </div>
+
+            {/* Ad banner */}
+            <AdBanner />
 
             {/* Macro stat pills */}
             <div className="grid grid-cols-3 gap-3">
@@ -341,7 +356,14 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                 Today&apos;s Meals
               </p>
               {MEALS.map((meal) => (
-                <MealSection key={meal} mealType={meal} entries={foodEntries} onDelete={handleDelete} onAdd={handleAddFromMeal} />
+                <MealSection
+                  key={meal}
+                  mealType={meal}
+                  entries={foodEntries}
+                  onDelete={handleDelete}
+                  onAdd={handleAddFromMeal}
+                  onEdit={setEditingEntry}
+                />
               ))}
             </div>
           </div>
@@ -458,8 +480,15 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                             P {Math.round(entry.protein)}g · C {Math.round(entry.carbs)}g · F {Math.round(entry.fats)}g
                           </p>
                         </div>
-                        <div className="flex items-center gap-2.5 flex-shrink-0">
-                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{entry.calories}</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 mr-1">{entry.calories}</span>
+                          <button
+                            onClick={() => setEditingEntry(entry)}
+                            className="w-6 h-6 rounded-lg text-slate-300 dark:text-slate-600 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center justify-center"
+                            title="Edit"
+                          >
+                            ✏️
+                          </button>
                           <button onClick={() => handleDelete(entry._id)} className="w-6 h-6 rounded-lg text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center text-base leading-none">×</button>
                         </div>
                       </div>
@@ -544,6 +573,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                 })}
               </div>
             </div>
+
+            {/* Ad banner */}
+            <AdBanner />
 
             {/* Logout */}
             <button onClick={handleLogout} className="w-full border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 rounded-2xl py-3 font-semibold text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">

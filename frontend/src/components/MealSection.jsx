@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 
 const MEAL_CONFIG = {
   breakfast: { emoji: "🌅", label: "Breakfast" },
@@ -8,7 +8,7 @@ const MEAL_CONFIG = {
   snacks:    { emoji: "🍎", label: "Snacks" },
 };
 
-export default function MealSection({ mealType, entries, onDelete, onAdd }) {
+export default function MealSection({ mealType, entries, onDelete, onAdd, onEdit }) {
   const [expanded, setExpanded] = useState(true);
   const config = MEAL_CONFIG[mealType];
   const mealEntries = entries.filter((e) => (e.mealType || "snacks") === mealType);
@@ -67,13 +67,23 @@ export default function MealSection({ mealType, entries, onDelete, onAdd }) {
                     P {Math.round(entry.protein)}g · C {Math.round(entry.carbs)}g · F {Math.round(entry.fats)}g
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 mr-1">
                     {entry.calories}
                   </span>
+                  {onEdit && (
+                    <button
+                      onClick={() => onEdit(entry)}
+                      className="p-1 rounded-lg text-slate-300 dark:text-slate-600 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
                   <button
                     onClick={() => onDelete(entry._id)}
                     className="p-1 rounded-lg text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    title="Delete"
                   >
                     <Trash2 size={13} />
                   </button>
