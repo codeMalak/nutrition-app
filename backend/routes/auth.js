@@ -134,15 +134,6 @@ router.post("/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Only block users explicitly unverified (existing pre-feature accounts have emailVerified=undefined)
-    if (user.emailVerified === false) {
-      return res.status(403).json({
-        error: "Please verify your email before logging in.",
-        unverified: true,
-        email,
-      });
-    }
-
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET,
