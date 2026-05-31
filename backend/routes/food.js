@@ -91,6 +91,21 @@ router.get("/:date", authMiddleware, async (req, res) => {
   }
 });
 
+router.put("/:id", authMiddleware, async (req, res) => {
+  try {
+    const { name, calories, protein, fats, carbs, mealType } = req.body;
+    const entry = await FoodEntry.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { name, calories, protein, fats, carbs, mealType },
+      { new: true }
+    );
+    if (!entry) return res.status(404).json({ error: "Entry not found" });
+    res.json(entry);
+  } catch (err) {
+    res.status(500).json({ error: "Error updating food entry" });
+  }
+});
+
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     await FoodEntry.deleteOne({ _id: req.params.id, userId: req.user.id });

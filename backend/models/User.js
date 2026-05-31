@@ -8,7 +8,10 @@ const userSchema = new mongoose.Schema({
     protein: { type: Number, default: 150 },
     fats: { type: Number, default: 70 },
     carbs: { type: Number, default: 200 }
-  }
+  },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String },
+  emailVerificationExpires: { type: Date }
 });
 
 module.exports = mongoose.model("User", userSchema);
