@@ -1,26 +1,34 @@
 import { useEffect, useRef } from "react";
 
+const CONTAINER_ID = "container-be31c58e35dac8eeb0699a8eb0551d17";
 const ADSTERRA_SRC =
-  "https://pl29604118.effectivecpmnetwork.com/c4/d7/69/c4d769a199c53735404c22d10da1f68e.js";
+  "https://pl29604187.effectivecpmnetwork.com/be31c58e35dac8eeb0699a8eb0551d17/invoke.js";
 
 export default function AdBanner({ className = "" }) {
-  const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
 
     const script = document.createElement("script");
     script.src = ADSTERRA_SRC;
     script.async = true;
-    container.appendChild(script);
+    script.setAttribute("data-cfasync", "false");
+
+    // Append script right after the container div so Adsterra finds it
+    wrapper.appendChild(script);
 
     return () => {
-      if (container && container.contains(script)) {
-        container.removeChild(script);
+      if (wrapper && wrapper.contains(script)) {
+        wrapper.removeChild(script);
       }
     };
   }, []);
 
-  return <div ref={containerRef} className={className} />;
+  return (
+    <div ref={wrapperRef} className={className}>
+      <div id={CONTAINER_ID} />
+    </div>
+  );
 }
