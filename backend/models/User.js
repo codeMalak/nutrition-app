@@ -11,7 +11,8 @@ const userSchema = new mongoose.Schema({
   },
   emailVerified: { type: Boolean, default: false },
   emailVerificationToken: { type: String },
-  emailVerificationExpires: { type: Date }
+  emailVerificationExpires: { type: Date },
+  isPremium: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model("User", userSchema);

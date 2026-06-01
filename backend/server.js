@@ -9,11 +9,15 @@ const FoodDatabaseRoutes = require("./routes/foodDatabase");
 const usdaSearchRoutes = require("./routes/usdaFoodSearch");
 const barcodeRoutes = require("./routes/usdaBarcode");
 const aiRoutes = require("./routes/ai");
+const paymentRoutes = require("./routes/payments");
 
-
-const app = express();   // ✅ app created first
+const app = express();
 
 app.use(cors());
+
+// Stripe webhook needs raw body — must be registered BEFORE express.json()
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
@@ -22,6 +26,7 @@ app.use("/api/fooddb", FoodDatabaseRoutes);
 app.use("/api/usda", usdaSearchRoutes);
 app.use("/api/usda", barcodeRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/payments", paymentRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
