@@ -28,4 +28,8 @@ export const api = {
   // AI food analysis
   analyzeFood: (imageData, mediaType) =>
     axios.post("/api/ai/analyze-food", { imageData, mediaType }, getConfig()),
+
+  // Payments
+  createCheckoutSession: () =>
+    axios.post("/api/payments/create-checkout-session", {}, getConfig()),
 };

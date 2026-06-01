@@ -4,6 +4,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -41,6 +42,7 @@ function App() {
       <Route path="/login" element={<LoginPage setToken={setToken} />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+      <Route path="/payment-success" element={<PaymentSuccessPage />} />
       <Route
         path="/dashboard"
         element={

@@ -17,6 +17,7 @@ import MacroBar from "../components/MacroBar";
 import MealSection from "../components/MealSection";
 import EditFoodModal from "../components/EditFoodModal";
 import AdBanner from "../components/AdBanner";
+import PremiumBanner from "../components/PremiumBanner";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -48,6 +49,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
   const [activeMealType, setActiveMealType] = useState("snacks");
   const [water, setWater] = useState(0);
   const [editingEntry, setEditingEntry] = useState(null);
+  const [isPremium, setIsPremium] = useState(false);
   const WATER_GOAL = 8;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -68,8 +70,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
   const fetchProfile = useCallback(async () => {
     try {
       const res = await api.getProfile();
-      const { dailyCalorieGoal, macroGoals } = res.data;
+      const { dailyCalorieGoal, macroGoals, isPremium: premiumStatus } = res.data;
       setGoals({ dailyCalorieGoal, macroGoals });
+      setIsPremium(!!premiumStatus);
       setEditingGoals({
         dailyCalorieGoal,
         protein: macroGoals.protein,
@@ -305,8 +308,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
               </div>
             </div>
 
-            {/* Ad banner */}
-            <AdBanner />
+            {/* Ad / premium banner */}
+            {isPremium ? null : <AdBanner />}
+            {!isPremium && <PremiumBanner />}
 
             {/* Macro stat pills */}
             <div className="grid grid-cols-3 gap-3">
@@ -574,8 +578,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
               </div>
             </div>
 
-            {/* Ad banner */}
-            <AdBanner />
+            {/* Ad / premium banner */}
+            {isPremium ? null : <AdBanner />}
+            {!isPremium && <PremiumBanner />}
 
             {/* Logout */}
             <button onClick={handleLogout} className="w-full border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 rounded-2xl py-3 font-semibold text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
