@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 
 const CONTAINER_ID = "container-be31c58e35dac8eeb0699a8eb0551d17";
-const ADSTERRA_SRC =
-  "https://pl29604187.effectivecpmnetwork.com/be31c58e35dac8eeb0699a8eb0551d17/invoke.js";
+
+// Script is proxied through your own backend so ad blockers
+// filtering known ad-network domains won't intercept it.
+const AD_SRC = "/api/v1/metrics.js";
 
 export default function AdBanner({ className = "" }) {
   const wrapperRef = useRef(null);
@@ -12,11 +14,10 @@ export default function AdBanner({ className = "" }) {
     if (!wrapper) return;
 
     const script = document.createElement("script");
-    script.src = ADSTERRA_SRC;
+    script.src = AD_SRC;
     script.async = true;
     script.setAttribute("data-cfasync", "false");
 
-    // Append script right after the container div so Adsterra finds it
     wrapper.appendChild(script);
 
     return () => {

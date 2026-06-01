@@ -11,6 +11,7 @@ const barcodeRoutes = require("./routes/usdaBarcode");
 const aiRoutes = require("./routes/ai");
 const paymentRoutes = require("./routes/payments");
 const weightRoutes  = require("./routes/weight");
+const adsRoutes     = require("./routes/ads");
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/usda", barcodeRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/weight",   weightRoutes);
+app.use("/api",          adsRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
