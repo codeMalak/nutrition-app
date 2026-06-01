@@ -298,6 +298,14 @@ export default function DashboardPage({ toggleDark, darkMode }) {
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-28 md:pb-10">
 
+        {/* Persistent ad / premium banner — shows on every tab */}
+        {!isPremium && (
+          <div className="space-y-2 mb-4">
+            <AdBanner />
+            <PremiumBanner />
+          </div>
+        )}
+
         {/* ── HOME TAB ── */}
         {activeTab === "home" && (
           <div className="space-y-4 animate-fadeIn">
@@ -330,10 +338,6 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                 </div>
               </div>
             </div>
-
-            {/* Ad / premium banner */}
-            {isPremium ? null : <AdBanner />}
-            {!isPremium && <PremiumBanner />}
 
             {/* Macro stat pills */}
             <div className="grid grid-cols-3 gap-3">
@@ -562,28 +566,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
               </div>
             </div>
 
-            {/* Weekly chart */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 transition-colors duration-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">This Week</h2>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">Goal: {goals.dailyCalorieGoal.toLocaleString()} kcal</span>
-              </div>
-              {weeklyData.length > 0 ? (
-                <Bar data={weeklyChartData} options={weeklyChartOptions} />
-              ) : (
-                <div className="h-36 flex items-center justify-center">
-                  <p className="text-slate-400 dark:text-slate-500 text-sm">Loading chart...</p>
-                </div>
-              )}
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2">
-                Purple = under goal · Red = over goal
-              </p>
-            </div>
-
-            {/* Weight tracker */}
-            <WeightTracker darkMode={darkMode} />
-
-            {/* Macro split */}
+            {/* Macro split — sits right next to Daily Goals */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 transition-colors duration-200">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Today&apos;s Macro Split</h2>
               <div className="grid grid-cols-3 gap-3">
@@ -604,9 +587,26 @@ export default function DashboardPage({ toggleDark, darkMode }) {
               </div>
             </div>
 
-            {/* Ad / premium banner */}
-            {isPremium ? null : <AdBanner />}
-            {!isPremium && <PremiumBanner />}
+            {/* Weekly chart */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 transition-colors duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">This Week</h2>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">Goal: {goals.dailyCalorieGoal.toLocaleString()} kcal</span>
+              </div>
+              {weeklyData.length > 0 ? (
+                <Bar data={weeklyChartData} options={weeklyChartOptions} />
+              ) : (
+                <div className="h-36 flex items-center justify-center">
+                  <p className="text-slate-400 dark:text-slate-500 text-sm">Loading chart...</p>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2">
+                Purple = under goal · Red = over goal
+              </p>
+            </div>
+
+            {/* Weight tracker */}
+            <WeightTracker darkMode={darkMode} />
 
             {/* Logout */}
             <button onClick={handleLogout} className="w-full border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 rounded-2xl py-3 font-semibold text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">

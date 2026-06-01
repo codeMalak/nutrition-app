@@ -34,6 +34,7 @@ export default function WeightTracker({ darkMode }) {
   const [editingEntry, setEditingEntry] = useState(null);
   const [editForm, setEditForm]     = useState({});
   const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -48,13 +49,18 @@ export default function WeightTracker({ darkMode }) {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!form.weight || !form.date) return;
+    setError("");
+    if (!form.weight || !form.date) {
+      setError("Please enter a weight and date.");
+      return;
+    }
     setLoading(true);
     try {
       await api.addWeightEntry({ ...form, weight: Number(form.weight), unit: displayUnit });
       setForm({ weight: "", date: today, note: "" });
       await fetchEntries();
     } catch (err) {
+      setError(err.response?.data?.error || err.message || "Failed to save. Is the server running?");
       console.error(err);
     } finally {
       setLoading(false);
@@ -246,13 +252,16 @@ export default function WeightTracker({ darkMode }) {
             onChange={(e) => setForm({ ...form, note: e.target.value })}
             className={inputCls}
           />
+          {error && (
+            <p className="text-sm text-red-500 dark:text-red-400 text-center px-1">{error}</p>
+          )}
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 active:scale-[0.99] transition-all shadow-sm"
+            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 active:scale-[0.99] transition-all shadow-sm disabled:opacity-60"
           >
             <Plus size={15} />
-            Log Weight
+            {loading ? "Saving…" : "Log Weight"}
           </button>
         </form>
       </div>
