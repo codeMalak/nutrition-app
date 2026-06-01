@@ -10,6 +10,7 @@ const usdaSearchRoutes = require("./routes/usdaFoodSearch");
 const barcodeRoutes = require("./routes/usdaBarcode");
 const aiRoutes = require("./routes/ai");
 const paymentRoutes = require("./routes/payments");
+const weightRoutes  = require("./routes/weight");
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/usda", usdaSearchRoutes);
 app.use("/api/usda", barcodeRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/weight",   weightRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))

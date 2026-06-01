@@ -8,6 +8,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { Share2 } from "lucide-react";
 import { Bar } from "react-chartjs-2";
 import Navbar from "../components/Navbar";
 import BottomTabBar from "../components/BottomTabBar";
@@ -18,6 +19,8 @@ import MealSection from "../components/MealSection";
 import EditFoodModal from "../components/EditFoodModal";
 import AdBanner from "../components/AdBanner";
 import PremiumBanner from "../components/PremiumBanner";
+import ShareModal from "../components/ShareModal";
+import WeightTracker from "../components/WeightTracker";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -50,6 +53,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
   const [water, setWater] = useState(0);
   const [editingEntry, setEditingEntry] = useState(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const WATER_GOAL = 8;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -273,6 +277,16 @@ export default function DashboardPage({ toggleDark, darkMode }) {
         darkMode={darkMode}
       />
 
+      {/* Share modal */}
+      {showShare && (
+        <ShareModal
+          totals={totals}
+          goals={goals}
+          water={water}
+          onClose={() => setShowShare(false)}
+        />
+      )}
+
       {/* Edit food entry modal */}
       {editingEntry && (
         <EditFoodModal
@@ -294,9 +308,18 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                 <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Daily Summary
                 </h2>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-medium">
-                  Goal: {goals.dailyCalorieGoal.toLocaleString()} kcal
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-medium">
+                    Goal: {goals.dailyCalorieGoal.toLocaleString()} kcal
+                  </span>
+                  <button
+                    onClick={() => setShowShare(true)}
+                    className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    title="Share progress"
+                  >
+                    <Share2 size={15} />
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-5">
                 <CalorieRing consumed={totals.calories} goal={goals.dailyCalorieGoal} />
@@ -556,6 +579,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                 Purple = under goal · Red = over goal
               </p>
             </div>
+
+            {/* Weight tracker */}
+            <WeightTracker darkMode={darkMode} />
 
             {/* Macro split */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 transition-colors duration-200">

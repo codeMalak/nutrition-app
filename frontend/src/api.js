@@ -32,4 +32,10 @@ export const api = {
   // Payments
   createCheckoutSession: () =>
     axios.post("/api/payments/create-checkout-session", {}, getConfig()),
+
+  // Weight tracking
+  getWeightEntries:    ()          => axios.get("/api/weight", getConfig()),
+  addWeightEntry:      (entry)     => axios.post("/api/weight", entry, getConfig()),
+  updateWeightEntry:   (id, entry) => axios.put(`/api/weight/${id}`, entry, getConfig()),
+  deleteWeightEntry:   (id)        => axios.delete(`/api/weight/${id}`, getConfig()),
 };
