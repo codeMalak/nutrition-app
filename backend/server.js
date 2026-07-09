@@ -15,7 +15,16 @@ const adsRoutes     = require("./routes/ads");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://www.leanhostzone.com",
+    "capacitor://localhost",
+    "ionic://localhost",
+    "http://localhost",
+  ],
+  credentials: true,
+}));
 
 // Stripe webhook needs raw body — must be registered BEFORE express.json()
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
