@@ -1,9 +1,9 @@
 import axios from "axios";
 
-// In Capacitor (native app), relative URLs resolve to capacitor://localhost
-// which doesn't reach the backend — use the live server URL instead.
-const isCapacitor = !!(window.Capacitor?.isNativePlatform?.());
-const BASE = isCapacitor ? "https://www.leanhostzone.com" : "";
+// Capacitor webview always serves from capacitor:// protocol — use absolute URL
+const BASE = window.location.protocol === "capacitor:"
+  ? "https://www.leanhostzone.com"
+  : "";
 
 const getConfig = () => ({
   headers: { Authorization: localStorage.getItem("token") },

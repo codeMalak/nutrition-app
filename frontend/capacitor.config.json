@@ -1,0 +1,11 @@
+{
+  "appId": "com.leanhostzone.nutritrack",
+  "appName": "NutriTrack",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "server": {
+    "allowNavigation": ["www.leanhostzone.com"]
+  }
+}
