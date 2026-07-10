@@ -14,7 +14,7 @@ import { Plus, Trash2, Pencil, X, Check, Scale } from "lucide-react";
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Filler);
 
-const today = new Date().toISOString().slice(0, 10);
+const getToday = () => new Date().toLocaleDateString("en-CA");
 
 const toLbs = (kg) => +(kg * 2.20462).toFixed(1);
 const toKg  = (lbs) => +(lbs / 2.20462).toFixed(1);
@@ -30,7 +30,7 @@ const inputCls =
 export default function WeightTracker({ darkMode }) {
   const [entries, setEntries]       = useState([]);
   const [displayUnit, setDisplayUnit] = useState("lbs");
-  const [form, setForm]             = useState({ weight: "", date: today, note: "" });
+  const [form, setForm]             = useState({ weight: "", date: getToday(), note: "" });
   const [editingEntry, setEditingEntry] = useState(null);
   const [editForm, setEditForm]     = useState({});
   const [loading, setLoading]       = useState(false);
@@ -57,7 +57,7 @@ export default function WeightTracker({ darkMode }) {
     setLoading(true);
     try {
       await api.addWeightEntry({ ...form, weight: Number(form.weight), unit: displayUnit });
-      setForm({ weight: "", date: today, note: "" });
+      setForm({ weight: "", date: getToday(), note: "" });
       await fetchEntries();
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Failed to save. Is the server running?");

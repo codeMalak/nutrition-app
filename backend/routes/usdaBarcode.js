@@ -12,15 +12,18 @@ router.get("/barcode/:code", async (req, res) => {
         api_key: process.env.USDA_API_KEY,
         query: barcode,
         dataType: "Branded",
-        pageSize: 1,
+        pageSize: 5,
       },
     });
 
-    const food = response.data.foods?.[0];
+    const foods = response.data.foods || [];
+    if (!foods.length) return res.status(404).json({ error: "Food not found" });
 
-    if (!food) {
-      return res.status(404).json({ error: "Food not found" });
-    }
+    // Prefer exact GTIN/UPC match (strip leading zeros for comparison); fall back to first result
+    const stripped = barcode.replace(/^0+/, "");
+    const food =
+      foods.find((f) => f.gtinUpc && f.gtinUpc.replace(/^0+/, "") === stripped) ||
+      foods[0];
 
     let calories = 0, protein = 0, fats = 0, carbs = 0;
 

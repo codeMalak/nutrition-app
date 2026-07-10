@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../api";
+import { saveFoodToHistory } from "../utils/foodHistory";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -40,7 +41,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
     dailyCalorieGoal: 2000,
     macroGoals: { protein: 150, fats: 70, carbs: 200 },
   });
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [weeklyData, setWeeklyData] = useState([]);
   const [newFood, setNewFood] = useState({
     name: "", calories: "", protein: "", fats: "", carbs: "", mealType: "snacks",
@@ -129,6 +130,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
     e.preventDefault();
     try {
       await api.addFoodEntry({ ...newFood, date });
+      saveFoodToHistory(newFood);
       setNewFood({ name: "", calories: "", protein: "", fats: "", carbs: "", mealType: "snacks" });
       await fetchFood();
       setActiveTab("home");
@@ -296,7 +298,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
         />
       )}
 
-      <main className="max-w-2xl mx-auto px-4 py-5 pb-28 md:pb-10">
+      <main className="max-w-2xl mx-auto px-4 py-5 pb-36 md:pb-10">
 
         {/* Persistent ad / premium banner — shows on every tab */}
         {!isPremium && (

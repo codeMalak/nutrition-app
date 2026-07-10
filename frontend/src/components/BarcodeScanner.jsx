@@ -254,20 +254,26 @@ export default function BarcodeScanner({ onAdd, onClose, defaultMealType = "snac
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
               <button
                 onClick={handleScanAgain}
-                className="flex items-center justify-center gap-1.5 px-4 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex items-center justify-center gap-1.5 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 <RefreshCw size={13} />
                 Again
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 active:scale-[0.98] transition-all"
+                className="flex items-center justify-center gap-1.5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 active:scale-[0.98] transition-all"
               >
                 <Plus size={14} />
-                Add to Log
+                Add
               </button>
             </div>
           </div>

@@ -22,7 +22,7 @@ export default function EditFoodModal({ entry, onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm border border-slate-100 dark:border-slate-700 shadow-2xl transition-colors duration-200">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm border border-slate-100 dark:border-slate-700 shadow-2xl max-h-[85vh] overflow-y-auto transition-colors duration-200">
 
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 dark:border-slate-700">
           <div>

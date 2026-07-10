@@ -32,7 +32,7 @@ router.get("/search", async (req, res) => {
         food.foodNutrients.forEach(n => {
 
           const name = n.nutrientName || n.nutrient?.name;
-          const value = n.value || n.amount || 0;
+          const value = n.value ?? n.amount ?? 0;
 
           if (name === "Energy") calories = value;
           if (name === "Protein") protein = value;

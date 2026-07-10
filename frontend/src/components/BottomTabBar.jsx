@@ -10,7 +10,10 @@ const TABS = [
 
 export default function BottomTabBar({ activeTab, setActiveTab }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.3)] md:hidden transition-colors duration-200">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.3)] md:hidden transition-colors duration-200"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="grid grid-cols-5 h-[62px]">
         {TABS.map(({ key, label, Icon }) => {
           const isActive = activeTab === key;

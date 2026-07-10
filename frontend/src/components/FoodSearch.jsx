@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { api } from "../api";
-import { Search, Loader2, Barcode, Camera } from "lucide-react";
+import { Search, Loader2, Barcode, Camera, Clock, Plus } from "lucide-react";
 import BarcodeScanner from "./BarcodeScanner";
 import FoodAdjustModal from "./FoodAdjustModal";
 import PhotoAnalyzer from "./PhotoAnalyzer";
+import { getFoodHistory } from "../utils/foodHistory";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snacks"];
 
@@ -23,6 +24,7 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
   const [showScanner, setShowScanner] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [adjustingFood, setAdjustingFood] = useState(null);
+  const [history] = useState(() => getFoodHistory());
 
   const searchFoods = async () => {
     if (!query.trim()) return;
@@ -153,6 +155,35 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
             </div>
           </div>
         </div>
+
+        {/* Recent foods — shown before first search */}
+        {!searched && !loading && history.length > 0 && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 transition-colors duration-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock size={13} className="text-slate-400 dark:text-slate-500" />
+              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                Recent Foods
+              </p>
+            </div>
+            <div className="space-y-2">
+              {history.slice(0, 6).map((food, i) => (
+                <button
+                  key={i}
+                  onClick={() => setAdjustingFood({ ...food, servingSize: 1, servingUnit: "serving" })}
+                  className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-left hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-700 border border-transparent transition-all"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{food.name}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                      {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fats}g
+                    </p>
+                  </div>
+                  <Plus size={15} className="text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Loading */}
         {loading && (
