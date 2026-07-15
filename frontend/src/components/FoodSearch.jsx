@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { api } from "../api";
-import { Search, Loader2, Barcode, Camera, Clock, Plus } from "lucide-react";
+import { Search, Loader2, Barcode, Camera, Clock, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import BarcodeScanner from "./BarcodeScanner";
 import FoodAdjustModal from "./FoodAdjustModal";
 import PhotoAnalyzer from "./PhotoAnalyzer";
@@ -16,28 +16,46 @@ const MEAL_BADGE = {
 };
 
 export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
+  const [query, setQuery]           = useState("");
+  const [results, setResults]       = useState([]);
   const [selectedMeal, setSelectedMeal] = useState(defaultMealType);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [searched, setSearched]     = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [showPhoto, setShowPhoto] = useState(false);
+  const [showPhoto, setShowPhoto]   = useState(false);
   const [adjustingFood, setAdjustingFood] = useState(null);
-  const [history] = useState(() => getFoodHistory());
+  const [history]                   = useState(() => getFoodHistory());
 
-  const searchFoods = async () => {
-    if (!query.trim()) return;
+  // Pagination
+  const [page, setPage]             = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalHits, setTotalHits]   = useState(0);
+
+  const resultsRef = useRef(null);
+
+  const fetchPage = async (targetPage, searchQuery = query) => {
+    if (!searchQuery.trim()) return;
     setLoading(true);
     setSearched(true);
     try {
-      const res = await api.searchFoods(query.trim());
-      setResults(res.data);
+      const res = await api.searchFoods(searchQuery.trim(), targetPage);
+      const { foods, totalHits: hits, totalPages: pages, currentPage } = res.data;
+      setResults(foods);
+      setTotalHits(hits);
+      setTotalPages(pages);
+      setPage(currentPage);
+      // Scroll results into view on page change
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const searchFoods = () => {
+    setPage(1);
+    fetchPage(1);
   };
 
   const handleKeyDown = (e) => {
@@ -86,10 +104,7 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
           {/* Search row */}
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
-              />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 placeholder="Search foods, brands..."
@@ -100,7 +115,6 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
               />
             </div>
 
-            {/* Photo analyzer button */}
             <button
               onClick={() => setShowPhoto(true)}
               className="p-2.5 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
@@ -109,7 +123,6 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
               <Camera size={18} />
             </button>
 
-            {/* Barcode scan button */}
             <button
               onClick={() => setShowScanner(true)}
               className="p-2.5 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
@@ -118,17 +131,12 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
               <Barcode size={18} />
             </button>
 
-            {/* Search button */}
             <button
               onClick={searchFoods}
               disabled={loading || !query.trim()}
               className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
             >
-              {loading ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Search size={15} />
-              )}
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
               {loading ? "Searching" : "Search"}
             </button>
           </div>
@@ -170,7 +178,7 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
                 <button
                   key={i}
                   onClick={() => setAdjustingFood({ ...food, servingSize: 1, servingUnit: "serving" })}
-                  className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-left hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-700 border border-transparent transition-all"
+                  className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-left hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700 transition-all"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{food.name}</p>
@@ -213,10 +221,18 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
 
         {/* Results */}
         {!loading && results.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-1 uppercase tracking-wide">
-              {results.length} Results · Tap a result to adjust &amp; add
-            </p>
+          <div className="space-y-2" ref={resultsRef}>
+            {/* Results header */}
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                {totalHits.toLocaleString()} result{totalHits !== 1 ? "s" : ""} · tap to adjust &amp; add
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Page {page} of {totalPages}
+              </p>
+            </div>
+
+            {/* Result cards */}
             {results.map((food) => (
               <button
                 key={food.id}
@@ -244,7 +260,7 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
                       ))}
                     </div>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
-                      Base: {food.servingSize || 100}{food.servingUnit || "g"} · Tap to adjust serving &amp; add
+                      Per {food.servingSize || 100}{food.servingUnit || "g"} · Tap to adjust &amp; add
                     </p>
                   </div>
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize flex-shrink-0 mt-0.5 ${MEAL_BADGE[selectedMeal]}`}>
@@ -253,6 +269,59 @@ export default function FoodSearch({ onAdd, defaultMealType = "snacks" }) {
                 </div>
               </button>
             ))}
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 pb-1">
+                <button
+                  onClick={() => fetchPage(page - 1)}
+                  disabled={page <= 1}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft size={15} />
+                  Prev
+                </button>
+
+                {/* Page number pills */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    // Show pages around the current page
+                    let p;
+                    if (totalPages <= 5) {
+                      p = i + 1;
+                    } else if (page <= 3) {
+                      p = i + 1;
+                    } else if (page >= totalPages - 2) {
+                      p = totalPages - 4 + i;
+                    } else {
+                      p = page - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => fetchPage(p)}
+                        className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all ${
+                          p === page
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => fetchPage(page + 1)}
+                  disabled={page >= totalPages}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  Next
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

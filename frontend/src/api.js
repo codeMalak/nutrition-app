@@ -27,7 +27,7 @@ export const api = {
   getWeeklyData:   (startDate)  => axios.get(`${BASE}/api/food/weekly/${startDate}`, getConfig()),
 
   // USDA food search
-  searchFoods:     (query)      => axios.get(`${BASE}/api/usda/search?q=${encodeURIComponent(query)}`),
+  searchFoods:     (query, page = 1) => axios.get(`${BASE}/api/usda/search?q=${encodeURIComponent(query)}&page=${page}`),
   getFoodByBarcode: (code)      => axios.get(`${BASE}/api/usda/barcode/${code}`),
 
   // AI food analysis

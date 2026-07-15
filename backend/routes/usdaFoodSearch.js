@@ -9,7 +9,7 @@ const router = express.Router();
 // Foundation / SR Legacy foods have no meaningful servingSize so we keep
 // them at the per-100g base and let the user adjust freely.
 function normalise(food, rawNutrients) {
-  const isBranded  = food.dataType === "Branded";
+  const isBranded   = food.dataType === "Branded";
   const servingSize = food.servingSize || (isBranded ? null : 100);
 
   if (isBranded && servingSize) {
@@ -31,19 +31,26 @@ function normalise(food, rawNutrients) {
   };
 }
 
+const PAGE_SIZE = 10;
+
 router.get("/search", async (req, res) => {
-  const query = req.query.q;
+  const query    = req.query.q;
+  const page     = Math.max(1, parseInt(req.query.page) || 1);
 
   try {
     const response = await axios.get("https://api.nal.usda.gov/fdc/v1/foods/search", {
       params: {
-        api_key: process.env.USDA_API_KEY,
+        api_key:    process.env.USDA_API_KEY,
         query,
-        pageSize: 10,
+        pageSize:   PAGE_SIZE,
+        pageNumber: page,
       },
     });
 
-    const foods = response.data.foods.map((food) => {
+    const totalHits  = response.data.totalHits  || 0;
+    const totalPages = Math.max(1, Math.ceil(totalHits / PAGE_SIZE));
+
+    const foods = (response.data.foods || []).map((food) => {
       const raw = { calories: 0, protein: 0, fats: 0, carbs: 0 };
 
       (food.foodNutrients || []).forEach((n) => {
@@ -65,7 +72,7 @@ router.get("/search", async (req, res) => {
       };
     });
 
-    res.json(foods);
+    res.json({ foods, totalHits, currentPage: page, totalPages });
   } catch (err) {
     console.error("USDA ERROR:", err.message);
     res.status(500).json({ error: "USDA search failed" });
