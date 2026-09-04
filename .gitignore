@@ -2,6 +2,14 @@
 node_modules/
 **/node_modules/
 
+# Python virtual environments (unrelated scratch tooling, not part of the app)
+.venv/
+**/.venv/
+venv/
+**/venv/
+__pycache__/
+*.pyc
+
 # Build output
 frontend/dist/
 frontend/dist-ssr/

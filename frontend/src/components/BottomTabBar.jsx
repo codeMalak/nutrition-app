@@ -1,7 +1,8 @@
-import { Home, Search, PlusCircle, ClipboardList, User } from "lucide-react";
+import { Home, Footprints, Search, PlusCircle, ClipboardList, User } from "lucide-react";
 
 const TABS = [
   { key: "home",    label: "Home",    Icon: Home },
+  { key: "run",     label: "Run",     Icon: Footprints },
   { key: "search",  label: "Search",  Icon: Search },
   { key: "add",     label: "Add",     Icon: PlusCircle },
   { key: "log",     label: "Log",     Icon: ClipboardList },
@@ -14,7 +15,7 @@ export default function BottomTabBar({ activeTab, setActiveTab }) {
       className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.3)] md:hidden transition-colors duration-200"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-5 h-[62px]">
+      <div className="grid grid-cols-6 h-[62px]">
         {TABS.map(({ key, label, Icon }) => {
           const isActive = activeTab === key;
           return (

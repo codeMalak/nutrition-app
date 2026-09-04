@@ -43,4 +43,10 @@ export const api = {
   addWeightEntry:    (entry)    => axios.post(`${BASE}/api/weight`, entry, getConfig()),
   updateWeightEntry: (id, entry)=> axios.put(`${BASE}/api/weight/${id}`, entry, getConfig()),
   deleteWeightEntry: (id)       => axios.delete(`${BASE}/api/weight/${id}`, getConfig()),
+
+  // Running tracker
+  getRunEntries:  ()         => axios.get(`${BASE}/api/running`, getConfig()),
+  addRunEntry:    (entry)    => axios.post(`${BASE}/api/running`, entry, getConfig()),
+  updateRunEntry: (id, entry)=> axios.put(`${BASE}/api/running/${id}`, entry, getConfig()),
+  deleteRunEntry: (id)       => axios.delete(`${BASE}/api/running/${id}`, getConfig()),
 };
