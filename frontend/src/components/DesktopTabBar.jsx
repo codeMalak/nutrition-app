@@ -1,7 +1,8 @@
-import { Home, Search, PlusCircle, ClipboardList, User } from "lucide-react";
+import { Home, Footprints, Search, PlusCircle, ClipboardList, User } from "lucide-react";
 
 const TABS = [
   { key: "home",    label: "Home",      Icon: Home },
+  { key: "run",     label: "Run",       Icon: Footprints },
   { key: "search",  label: "Search",    Icon: Search },
   { key: "add",     label: "Add Food",  Icon: PlusCircle },
   { key: "log",     label: "Food Log",  Icon: ClipboardList },

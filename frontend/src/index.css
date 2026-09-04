@@ -91,3 +91,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .animate-scan {
   animation: scan 2s linear infinite;
 }
+
+/* Dark-mode run map — there's no key-less dark tile server, so invert the
+   plain OSM tiles instead. Scoped to the tile pane only so the route line
+   and start/end markers (drawn in Leaflet's overlay pane) keep their real
+   colors on top of the inverted base map. */
+.map-dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.93) contrast(0.9);
+}

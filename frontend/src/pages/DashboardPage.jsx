@@ -22,6 +22,7 @@ import AdBanner from "../components/AdBanner";
 import PremiumBanner from "../components/PremiumBanner";
 import ShareModal from "../components/ShareModal";
 import WeightTracker from "../components/WeightTracker";
+import RunTracker from "../components/RunTracker";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -55,6 +56,7 @@ export default function DashboardPage({ toggleDark, darkMode }) {
   const [editingEntry, setEditingEntry] = useState(null);
   const [isPremium, setIsPremium] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [todaysRunCalories, setTodaysRunCalories] = useState(0);
   const WATER_GOAL = 8;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -107,6 +109,20 @@ export default function DashboardPage({ toggleDark, darkMode }) {
   useEffect(() => { fetchFood(); }, [fetchFood]);
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
   useEffect(() => { if (activeTab === "profile") fetchWeekly(); }, [activeTab, fetchWeekly]);
+
+  // Ties the Run tracker into the daily summary — no per-date endpoint exists
+  // yet, so pull the (typically small) run history and filter client-side.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.getRunEntries();
+        const todays = res.data.filter((r) => r.date === date);
+        setTodaysRunCalories(todays.reduce((sum, r) => sum + (r.calories || 0), 0));
+      } catch (err) {
+        console.error("fetchRunCalories error:", err);
+      }
+    })();
+  }, [date]);
 
   useEffect(() => {
     const saved = localStorage.getItem(`water_${date}`);
@@ -319,6 +335,11 @@ export default function DashboardPage({ toggleDark, darkMode }) {
                   Daily Summary
                 </h2>
                 <div className="flex items-center gap-2">
+                  {todaysRunCalories > 0 && (
+                    <span className="text-[11px] text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2.5 py-1 rounded-full font-medium">
+                      🔥 {Math.round(todaysRunCalories)} burned
+                    </span>
+                  )}
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-medium">
                     Goal: {goals.dailyCalorieGoal.toLocaleString()} kcal
                   </span>
@@ -401,6 +422,9 @@ export default function DashboardPage({ toggleDark, darkMode }) {
             </div>
           </div>
         )}
+
+        {/* ── RUN TAB ── */}
+        {activeTab === "run" && <RunTracker darkMode={darkMode} />}
 
         {/* ── SEARCH TAB ── */}
         {activeTab === "search" && (
