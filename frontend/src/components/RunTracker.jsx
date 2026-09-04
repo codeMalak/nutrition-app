@@ -511,7 +511,16 @@ export default function RunTracker({ darkMode }) {
           </p>
           <p className="text-emerald-100 text-xs font-medium mt-1">Time</p>
 
-          <div className="grid grid-cols-3 gap-3 mt-5">
+          <div className="flex items-end gap-2 mt-5 pt-4 border-t border-white/15">
+            <Gauge size={22} className="text-emerald-100 mb-1.5 flex-shrink-0" />
+            <p className="text-4xl font-extrabold tabular-nums leading-none">
+              {(isMovingNow ? mpsToUnitSpeed(liveStats.curSpeedMps, unit) : 0).toFixed(1)}
+            </p>
+            <p className="text-emerald-100 text-sm font-semibold mb-0.5">{unitLabel(unit)}/h</p>
+            <p className="text-emerald-100 text-[11px] mb-1 ml-auto">current speed</p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mt-4">
             <div>
               <p className="text-2xl font-bold tabular-nums">{formatDistance(liveStats.distanceM, unit)}</p>
               <p className="text-[11px] text-emerald-100 mt-0.5">{unitLabel(unit)}</p>
@@ -529,12 +538,6 @@ export default function RunTracker({ darkMode }) {
               </p>
             </div>
           </div>
-
-          {isMovingNow && liveStats.curSpeedMps > 0 && (
-            <p className="text-emerald-100 text-xs mt-4 flex items-center gap-1.5">
-              <Gauge size={13} /> {mpsToUnitSpeed(liveStats.curSpeedMps, unit).toFixed(1)} {unitLabel(unit)}/h current speed
-            </p>
-          )}
         </div>
 
         {gpsError && (
@@ -580,6 +583,7 @@ export default function RunTracker({ darkMode }) {
 
   if (status === "review" && reviewData) {
     const pace = paceSecondsPerUnit(reviewData.duration, reviewData.distance, unit);
+    const avgSpeed = mpsToUnitSpeed(reviewData.distance / (reviewData.duration || 1), unit);
     return (
       <div className="space-y-4 animate-fadeIn">
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 transition-colors duration-200">
@@ -590,10 +594,16 @@ export default function RunTracker({ darkMode }) {
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Run Complete!</h2>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <StatTile label={unitLabel(unit)} value={formatDistance(reviewData.distance, unit)} bg="bg-emerald-50 dark:bg-emerald-900/20" text="text-emerald-700 dark:text-emerald-400" subText="text-emerald-400 dark:text-emerald-600" />
             <StatTile label="Duration" value={formatDuration(reviewData.duration)} bg="bg-slate-50 dark:bg-slate-700/50" text="text-slate-700 dark:text-slate-300" />
             <StatTile label={`Pace /${unitLabel(unit)}`} value={formatPace(pace)} bg="bg-blue-50 dark:bg-blue-900/20" text="text-blue-700 dark:text-blue-400" subText="text-blue-400 dark:text-blue-600" />
+            <StatTile label={`Avg ${unitLabel(unit)}/h`} value={avgSpeed.toFixed(1)} bg="bg-blue-50 dark:bg-blue-900/20" text="text-blue-700 dark:text-blue-400" subText="text-blue-400 dark:text-blue-600" />
+            <StatTile
+              label={`Max ${unitLabel(unit)}/h`}
+              value={reviewData.maxSpeed ? mpsToUnitSpeed(reviewData.maxSpeed, unit).toFixed(1) : "–"}
+              bg="bg-violet-50 dark:bg-violet-900/20" text="text-violet-700 dark:text-violet-400" subText="text-violet-400 dark:text-violet-600"
+            />
             <StatTile
               label={reviewData.hasElevation ? `${elevUnitLabel(unit)} gain` : "Elevation"}
               value={reviewData.hasElevation ? Math.round(elevToUnit(reviewData.elevationGain, unit)) : "N/A"}
