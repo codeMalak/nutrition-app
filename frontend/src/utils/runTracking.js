@@ -8,13 +8,13 @@ export const KM_METERS = 1000;
 // GPS quality gates
 export const MAX_ACCURACY_M = 30;        // discard fixes worse than this
 export const MAX_PLAUSIBLE_SPEED_MPS = 12; // ~27mph — beyond this treat as a GPS jump
-export const LOW_SPEED_MPS = 0.5;         // ~1.1mph — below this counts as "stopped"
 export const MIN_DISTANCE_DELTA_M = 2;    // ignore displacement smaller than this — GPS jitter
                                            // at a standstill can otherwise read as "moving"
 export const MAX_POSITION_AGE_MS = 30000; // reject a fix this stale — likely a cached
                                            // "last known location", not a live one
-export const AUTO_PAUSE_MS = 8000;        // sustained low speed before showing "Auto-paused"
-                                           // (cosmetic only — doesn't gate what's recorded)
+export const MIN_PACE_DISTANCE_M = 30;    // don't show a live pace before this much distance —
+                                           // dividing by a near-zero distance is inherently
+                                           // unstable/misleading in the first few seconds
 
 export function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;

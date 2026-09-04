@@ -8,8 +8,8 @@ import {
   haversineMeters, unitToMeters, mpsToUnitSpeed, elevToUnit,
   elevUnitLabel, unitLabel, formatDistance, formatDuration, formatPace,
   paceSecondsPerUnit, estimateCalories, gpsQualityLabel, simplifyRoute,
-  MAX_ACCURACY_M, MAX_PLAUSIBLE_SPEED_MPS, LOW_SPEED_MPS, MIN_DISTANCE_DELTA_M,
-  MAX_POSITION_AGE_MS, AUTO_PAUSE_MS, MILE_METERS, KM_METERS,
+  MAX_ACCURACY_M, MAX_PLAUSIBLE_SPEED_MPS, MIN_DISTANCE_DELTA_M,
+  MAX_POSITION_AGE_MS, MIN_PACE_DISTANCE_M, MILE_METERS, KM_METERS,
 } from "../utils/runTracking";
 
 // Leaflet is a meaningful chunk of JS — only load it once a map is actually shown.
@@ -26,11 +26,12 @@ function freshTrack() {
   return {
     watchId: null,
     startTime: null,
+    pausedMs: 0,    // total ms spent in manual pauses so far
+    pausedAt: null, // Date.now() when the current pause began (null if not paused)
     points: [],
     lastPoint: null,
-    anchorPoint: null, // see handlePosition's no-device-speed fallback path
+    anchorPoint: null, // floating reference point used to confirm real movement — see handlePosition
     distanceM: 0,
-    movingMs: 0,
     elevGainM: 0,
     elevLossM: 0,
     smoothedElev: null,
@@ -38,8 +39,6 @@ function freshTrack() {
     hasElevation: false,
     maxSpeedMps: 0,
     curSpeedMps: 0,
-    lowSpeedSinceTs: null,
-    autoPaused: false,
     nextMileBoundary: MILE_METERS,
     nextKmBoundary: KM_METERS,
     lastMileSplitMs: 0,
@@ -49,10 +48,17 @@ function freshTrack() {
   };
 }
 
+// True wall-clock elapsed time since Start, minus time spent in manual
+// pauses — a real stopwatch, completely decoupled from GPS sample timing.
+function getElapsedMs(t, now = Date.now()) {
+  if (!t.startTime) return 0;
+  const pausedMs = t.pausedMs + (t.pausedAt != null ? now - t.pausedAt : 0);
+  return Math.max(0, now - t.startTime - pausedMs);
+}
+
 const freshLiveStats = {
   distanceM: 0, movingMs: 0, elevGainM: 0, elevLossM: 0, maxSpeedMps: 0,
-  curSpeedMps: 0, autoPaused: false, hasElevation: false, accuracy: null,
-  route: [],
+  curSpeedMps: 0, hasElevation: false, accuracy: null, route: [],
 };
 
 const inputCls =
@@ -70,9 +76,6 @@ function StatTile({ label, value, sub, bg, text, subText }) {
 
 export default function RunTracker({ darkMode }) {
   const [unit, setUnit] = useState(() => localStorage.getItem("run_unit") || "mi");
-  const [autoPauseEnabled, setAutoPauseEnabled] = useState(
-    () => localStorage.getItem("run_autopause") !== "off"
-  );
   const [status, setStatus] = useState("idle"); // idle | active | paused | review
   const [liveStats, setLiveStats] = useState(freshLiveStats);
   const [gpsError, setGpsError] = useState("");
@@ -91,12 +94,9 @@ export default function RunTracker({ darkMode }) {
 
   const trackRef = useRef(freshTrack());
   const statusRef = useRef(status);
-  const autoPauseRef = useRef(autoPauseEnabled);
 
   useEffect(() => { statusRef.current = status; }, [status]);
-  useEffect(() => { autoPauseRef.current = autoPauseEnabled; }, [autoPauseEnabled]);
   useEffect(() => { localStorage.setItem("run_unit", unit); }, [unit]);
-  useEffect(() => { localStorage.setItem("run_autopause", autoPauseEnabled ? "on" : "off"); }, [autoPauseEnabled]);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -141,11 +141,9 @@ export default function RunTracker({ darkMode }) {
     // Always use wall-clock time at the moment this callback actually fires —
     // NOT pos.timestamp. Phones/browsers frequently hand back a stale cached
     // "last known location" for the first fix or two before a live GPS lock;
-    // if that stale fix's own timestamp were used, the next real point would
-    // compute a huge, essentially arbitrary time delta and dump it straight
-    // into the moving-time stopwatch in one lump (it'd visibly jump instead
-    // of counting up from zero). Date.now() at callback time is immune to
-    // that, whatever the underlying fix's own age.
+    // a stale timestamp would make distance/elevation deltas computed
+    // against it unreliable. (The run's own timer no longer depends on any
+    // of this at all — see getElapsedMs, a plain wall-clock stopwatch.)
     const now = Date.now();
     const t = trackRef.current;
 
@@ -160,99 +158,84 @@ export default function RunTracker({ darkMode }) {
 
     const point = { lat: latitude, lng: longitude, elevation: altitude, t: now, accuracy };
 
-    if (t.lastPoint) {
-      const dt = (now - t.lastPoint.t) / 1000;
-      if (dt <= 0) return;
-      const dM = haversineMeters(t.lastPoint.lat, t.lastPoint.lng, latitude, longitude);
-      const impliedSpeed = dM / dt;
-      if (impliedSpeed > MAX_PLAUSIBLE_SPEED_MPS) return; // GPS jump artifact
-
-      // Prefer the device's own (Doppler-derived) speed reading when the
-      // browser provides one — it already distinguishes "standing still"
-      // from "genuinely moving slowly" correctly, independent of position
-      // noise, so the immediate sample-to-sample delta is trustworthy as-is.
-      const hasDeviceSpeed = speed != null && speed >= 0;
-      const curSpeed = hasDeviceSpeed ? speed : impliedSpeed;
-
-      let moving, moveDistanceM, moveDurationS;
-
-      if (hasDeviceSpeed) {
-        moving = curSpeed >= LOW_SPEED_MPS;
-        moveDistanceM = dM;
-        moveDurationS = dt;
-      } else {
-        // No device speed available — inferring speed from two raw fixes is
-        // noise-prone at short intervals (typical phone GPS accuracy is
-        // several meters, so a couple of meters of pure noise over ~1s reads
-        // as a plausible walking speed). Rather than gating on the
-        // immediately-previous sample (which would either let jitter through
-        // or, just as bad, permanently discard real movement too slow to
-        // clear the floor in a single sample), measure displacement from a
-        // fixed anchor point: it only counts as real movement once *cumulative*
-        // displacement since the anchor clears the noise floor — jitter
-        // around one spot never accumulates, while genuine slow movement
-        // still registers within a couple of seconds instead of never.
-        if (!t.anchorPoint) t.anchorPoint = t.lastPoint;
-        const dtFromAnchor = (now - t.anchorPoint.t) / 1000;
-        const dMFromAnchor = haversineMeters(t.anchorPoint.lat, t.anchorPoint.lng, latitude, longitude);
-        const speedFromAnchor = dtFromAnchor > 0 ? dMFromAnchor / dtFromAnchor : 0;
-
-        moving = dMFromAnchor >= MIN_DISTANCE_DELTA_M && speedFromAnchor >= LOW_SPEED_MPS;
-        moveDistanceM = dMFromAnchor;
-        moveDurationS = dtFromAnchor;
-        if (moving) t.anchorPoint = point; // confirmed movement — advance the anchor
-        // else: leave the anchor in place so displacement keeps accumulating
-        // across future samples instead of resetting every time.
-      }
-
-      // This only drives the cosmetic "Auto-paused" banner (after sustained
-      // low speed) — it no longer gates what actually gets recorded below,
-      // so a standstill can never rack up "moving time" against near-zero
-      // jitter distance the way it used to.
-      if (statusRef.current === "active") {
-        if (!moving) {
-          if (!t.lowSpeedSinceTs) t.lowSpeedSinceTs = now;
-          if (autoPauseRef.current && now - t.lowSpeedSinceTs > AUTO_PAUSE_MS) t.autoPaused = true;
-        } else {
-          t.lowSpeedSinceTs = null;
-          t.autoPaused = false;
-        }
-      }
-
-      const isMoving = statusRef.current === "active" && moving;
-      t.curSpeedMps = moving ? curSpeed : 0;
-
-      if (isMoving) {
-        t.distanceM += moveDistanceM;
-        t.movingMs += moveDurationS * 1000;
-        if (curSpeed > t.maxSpeedMps) t.maxSpeedMps = curSpeed;
-        t.points.push(point);
-
-        if (altitude != null) {
-          t.hasElevation = true;
-          t.smoothedElev = t.smoothedElev == null ? altitude : t.smoothedElev * 0.8 + altitude * 0.2;
-          if (t.lastSmoothedElev != null) {
-            const de = t.smoothedElev - t.lastSmoothedElev;
-            if (de > 0.5) t.elevGainM += de;
-            else if (de < -0.5) t.elevLossM += -de;
-          }
-          t.lastSmoothedElev = t.smoothedElev;
-        }
-
-        while (t.distanceM >= t.nextMileBoundary) {
-          t.mileSplits.push({ index: t.mileSplits.length + 1, duration: (t.movingMs - t.lastMileSplitMs) / 1000 });
-          t.lastMileSplitMs = t.movingMs;
-          t.nextMileBoundary += MILE_METERS;
-        }
-        while (t.distanceM >= t.nextKmBoundary) {
-          t.kmSplits.push({ index: t.kmSplits.length + 1, duration: (t.movingMs - t.lastKmSplitMs) / 1000 });
-          t.lastKmSplitMs = t.movingMs;
-          t.nextKmBoundary += KM_METERS;
-        }
-      }
-    } else {
-      t.points.push(point);
+    if (statusRef.current !== "active") {
+      // Manually paused (or not yet started) — keep the reference point
+      // fresh so resuming doesn't create a fake distance jump, but don't
+      // accumulate anything.
+      t.lastPoint = point;
+      return;
     }
+
+    if (!t.lastPoint) {
+      t.lastPoint = point;
+      t.anchorPoint = point;
+      t.points.push(point);
+      return;
+    }
+
+    const dt = (now - t.lastPoint.t) / 1000;
+    if (dt <= 0) { t.lastPoint = point; return; }
+    const dM = haversineMeters(t.lastPoint.lat, t.lastPoint.lng, latitude, longitude);
+    const impliedSpeed = dM / dt;
+    if (impliedSpeed > MAX_PLAUSIBLE_SPEED_MPS) { t.lastPoint = point; return; } // GPS jump artifact
+
+    // The device's own (Doppler-derived) speed reading, when the browser
+    // provides one, is purely informational here (current/max speed
+    // display) — it does NOT gate whether distance gets recorded. Relying
+    // on it for that turned out to be exactly the remaining bug: a real
+    // device can correctly report "moving" while the two raw position fixes
+    // sampled around it are still noisy/lagging (especially in the first
+    // few seconds of a run, while GPS accuracy is still refining), crediting
+    // a full second of time against a tiny mismatched distance and
+    // producing an absurd pace. So distance is decided by ONE consistent
+    // signal instead — see the anchor logic below.
+    const curSpeed = speed != null && speed >= 0 ? speed : impliedSpeed;
+    t.curSpeedMps = curSpeed;
+    if (curSpeed > t.maxSpeedMps) t.maxSpeedMps = curSpeed;
+
+    // Only cumulative displacement from a floating anchor point counts as
+    // real, recordable movement. Comparing every sample only to the
+    // immediately-previous one is noise-prone (typical phone GPS accuracy is
+    // several meters, so a couple of meters of pure jitter over ~1s can look
+    // like plausible movement) — measuring from a fixed anchor instead means
+    // jitter around one spot never accumulates (it never drifts far enough
+    // from the anchor to clear the floor), while genuine movement, however
+    // slow, still registers within a couple of seconds once it does.
+    if (!t.anchorPoint) t.anchorPoint = t.lastPoint;
+    const dMFromAnchor = haversineMeters(t.anchorPoint.lat, t.anchorPoint.lng, latitude, longitude);
+
+    if (dMFromAnchor >= MIN_DISTANCE_DELTA_M) {
+      t.distanceM += dMFromAnchor;
+      t.points.push(point);
+
+      if (altitude != null) {
+        t.hasElevation = true;
+        t.smoothedElev = t.smoothedElev == null ? altitude : t.smoothedElev * 0.8 + altitude * 0.2;
+        if (t.lastSmoothedElev != null) {
+          const de = t.smoothedElev - t.lastSmoothedElev;
+          if (de > 0.5) t.elevGainM += de;
+          else if (de < -0.5) t.elevLossM += -de;
+        }
+        t.lastSmoothedElev = t.smoothedElev;
+      }
+
+      const elapsedMs = getElapsedMs(t, now);
+      while (t.distanceM >= t.nextMileBoundary) {
+        t.mileSplits.push({ index: t.mileSplits.length + 1, duration: (elapsedMs - t.lastMileSplitMs) / 1000 });
+        t.lastMileSplitMs = elapsedMs;
+        t.nextMileBoundary += MILE_METERS;
+      }
+      while (t.distanceM >= t.nextKmBoundary) {
+        t.kmSplits.push({ index: t.kmSplits.length + 1, duration: (elapsedMs - t.lastKmSplitMs) / 1000 });
+        t.lastKmSplitMs = elapsedMs;
+        t.nextKmBoundary += KM_METERS;
+      }
+
+      t.anchorPoint = point; // confirmed movement — reset the anchor here
+    }
+    // else: leave the anchor in place so displacement keeps accumulating
+    // across future samples instead of resetting every time.
+
     t.lastPoint = point;
   };
 
@@ -287,12 +270,11 @@ export default function RunTracker({ darkMode }) {
       setLiveStats((s) => ({
         ...s,
         distanceM: t.distanceM,
-        movingMs: t.movingMs,
+        movingMs: getElapsedMs(t),
         elevGainM: t.elevGainM,
         elevLossM: t.elevLossM,
         maxSpeedMps: t.maxSpeedMps,
         curSpeedMps: t.curSpeedMps,
-        autoPaused: t.autoPaused,
         hasElevation: t.hasElevation,
         route: t.points, // same array, mutated in place — see RouteMap's note on `route?.length`
       }));
@@ -312,13 +294,27 @@ export default function RunTracker({ darkMode }) {
   };
 
   const handlePauseResume = () => {
-    setStatus((s) => (s === "active" ? "paused" : "active"));
+    const t = trackRef.current;
+    const now = Date.now();
+    setStatus((s) => {
+      if (s === "active") {
+        t.pausedAt = now;
+        return "paused";
+      }
+      if (t.pausedAt != null) {
+        t.pausedMs += now - t.pausedAt;
+        t.pausedAt = null;
+      }
+      // Don't let the gap while paused read as sudden distance on resume.
+      t.anchorPoint = t.lastPoint;
+      return "active";
+    });
   };
 
   const handleStop = () => {
     clearWatch();
     const t = trackRef.current;
-    const duration = Math.round(t.movingMs / 1000);
+    const duration = Math.round(getElapsedMs(t) / 1000);
 
     // An accidental start/stop tap — nothing worth reviewing or saving.
     if (t.distanceM < 10 && duration < 5) {
@@ -482,8 +478,13 @@ export default function RunTracker({ darkMode }) {
     }
   }
 
-  const currentPace = paceSecondsPerUnit(liveStats.movingMs / 1000, liveStats.distanceM, unit);
-  const isMovingNow = status === "active" && !liveStats.autoPaused;
+  // Don't show a live pace until there's enough distance for it to mean
+  // anything — dividing by a near-zero distance in the first few seconds of
+  // a run is inherently unstable no matter how clean the underlying data is.
+  const currentPace = liveStats.distanceM >= MIN_PACE_DISTANCE_M
+    ? paceSecondsPerUnit(liveStats.movingMs / 1000, liveStats.distanceM, unit)
+    : 0;
+  const isMovingNow = status === "active";
 
   // ── Render: active / paused ──────────────────────────────────────────────
 
@@ -498,8 +499,6 @@ export default function RunTracker({ darkMode }) {
             </div>
             {status === "paused" ? (
               <span className="bg-white/20 px-2.5 py-1 rounded-full text-xs font-bold">Paused</span>
-            ) : liveStats.autoPaused ? (
-              <span className="bg-amber-400/90 text-amber-950 px-2.5 py-1 rounded-full text-xs font-bold">Auto-paused</span>
             ) : (
               <span className="bg-white/20 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse" /> Tracking
@@ -510,7 +509,7 @@ export default function RunTracker({ darkMode }) {
           <p className="text-5xl font-extrabold tabular-nums mt-3 tracking-tight">
             {formatDuration(liveStats.movingMs / 1000)}
           </p>
-          <p className="text-emerald-100 text-xs font-medium mt-1">Moving Time</p>
+          <p className="text-emerald-100 text-xs font-medium mt-1">Time</p>
 
           <div className="grid grid-cols-3 gap-3 mt-5">
             <div>
@@ -714,16 +713,6 @@ export default function RunTracker({ darkMode }) {
         >
           <Play size={18} fill="currentColor" /> Start Run
         </button>
-
-        <label className="flex items-center justify-between mt-3 text-xs text-emerald-50 font-medium px-1">
-          <span>Auto-pause when stopped</span>
-          <input
-            type="checkbox"
-            checked={autoPauseEnabled}
-            onChange={(e) => setAutoPauseEnabled(e.target.checked)}
-            className="w-4 h-4 accent-white"
-          />
-        </label>
       </div>
 
       {/* Manual entry toggle */}
