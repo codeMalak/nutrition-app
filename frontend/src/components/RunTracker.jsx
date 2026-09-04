@@ -8,8 +8,8 @@ import {
   haversineMeters, unitToMeters, mpsToUnitSpeed, elevToUnit,
   elevUnitLabel, unitLabel, formatDistance, formatDuration, formatPace,
   paceSecondsPerUnit, estimateCalories, gpsQualityLabel, simplifyRoute,
-  MAX_ACCURACY_M, MAX_PLAUSIBLE_SPEED_MPS, LOW_SPEED_MPS,
-  AUTO_PAUSE_MS, MILE_METERS, KM_METERS,
+  MAX_ACCURACY_M, MAX_PLAUSIBLE_SPEED_MPS, LOW_SPEED_MPS, MIN_DISTANCE_DELTA_M,
+  MAX_POSITION_AGE_MS, AUTO_PAUSE_MS, MILE_METERS, KM_METERS,
 } from "../utils/runTracking";
 
 // Leaflet is a meaningful chunk of JS — only load it once a map is actually shown.
@@ -28,6 +28,7 @@ function freshTrack() {
     startTime: null,
     points: [],
     lastPoint: null,
+    anchorPoint: null, // see handlePosition's no-device-speed fallback path
     distanceM: 0,
     movingMs: 0,
     elevGainM: 0,
@@ -137,13 +138,25 @@ export default function RunTracker({ darkMode }) {
 
   const handlePosition = (pos) => {
     const { latitude, longitude, altitude, accuracy, speed } = pos.coords;
-    const now = pos.timestamp || Date.now();
+    // Always use wall-clock time at the moment this callback actually fires —
+    // NOT pos.timestamp. Phones/browsers frequently hand back a stale cached
+    // "last known location" for the first fix or two before a live GPS lock;
+    // if that stale fix's own timestamp were used, the next real point would
+    // compute a huge, essentially arbitrary time delta and dump it straight
+    // into the moving-time stopwatch in one lump (it'd visibly jump instead
+    // of counting up from zero). Date.now() at callback time is immune to
+    // that, whatever the underlying fix's own age.
+    const now = Date.now();
     const t = trackRef.current;
 
     setGpsError("");
     setLiveStats((s) => ({ ...s, accuracy }));
 
     if (accuracy != null && accuracy > MAX_ACCURACY_M) return; // low-quality fix
+    // Extra defense against the same stale-cached-fix problem: if the OS/browser
+    // is still handing back a "last known location" from a while ago, don't
+    // trust it as a live reference point at all.
+    if (pos.timestamp && now - pos.timestamp > MAX_POSITION_AGE_MS) return;
 
     const point = { lat: latitude, lng: longitude, elevation: altitude, t: now, accuracy };
 
@@ -154,9 +167,48 @@ export default function RunTracker({ darkMode }) {
       const impliedSpeed = dM / dt;
       if (impliedSpeed > MAX_PLAUSIBLE_SPEED_MPS) return; // GPS jump artifact
 
-      const curSpeed = speed != null && speed >= 0 ? speed : impliedSpeed;
-      const moving = curSpeed >= LOW_SPEED_MPS;
+      // Prefer the device's own (Doppler-derived) speed reading when the
+      // browser provides one — it already distinguishes "standing still"
+      // from "genuinely moving slowly" correctly, independent of position
+      // noise, so the immediate sample-to-sample delta is trustworthy as-is.
+      const hasDeviceSpeed = speed != null && speed >= 0;
+      const curSpeed = hasDeviceSpeed ? speed : impliedSpeed;
 
+      let moving, moveDistanceM, moveDurationS;
+
+      if (hasDeviceSpeed) {
+        moving = curSpeed >= LOW_SPEED_MPS;
+        moveDistanceM = dM;
+        moveDurationS = dt;
+      } else {
+        // No device speed available — inferring speed from two raw fixes is
+        // noise-prone at short intervals (typical phone GPS accuracy is
+        // several meters, so a couple of meters of pure noise over ~1s reads
+        // as a plausible walking speed). Rather than gating on the
+        // immediately-previous sample (which would either let jitter through
+        // or, just as bad, permanently discard real movement too slow to
+        // clear the floor in a single sample), measure displacement from a
+        // fixed anchor point: it only counts as real movement once *cumulative*
+        // displacement since the anchor clears the noise floor — jitter
+        // around one spot never accumulates, while genuine slow movement
+        // still registers within a couple of seconds instead of never.
+        if (!t.anchorPoint) t.anchorPoint = t.lastPoint;
+        const dtFromAnchor = (now - t.anchorPoint.t) / 1000;
+        const dMFromAnchor = haversineMeters(t.anchorPoint.lat, t.anchorPoint.lng, latitude, longitude);
+        const speedFromAnchor = dtFromAnchor > 0 ? dMFromAnchor / dtFromAnchor : 0;
+
+        moving = dMFromAnchor >= MIN_DISTANCE_DELTA_M && speedFromAnchor >= LOW_SPEED_MPS;
+        moveDistanceM = dMFromAnchor;
+        moveDurationS = dtFromAnchor;
+        if (moving) t.anchorPoint = point; // confirmed movement — advance the anchor
+        // else: leave the anchor in place so displacement keeps accumulating
+        // across future samples instead of resetting every time.
+      }
+
+      // This only drives the cosmetic "Auto-paused" banner (after sustained
+      // low speed) — it no longer gates what actually gets recorded below,
+      // so a standstill can never rack up "moving time" against near-zero
+      // jitter distance the way it used to.
       if (statusRef.current === "active") {
         if (!moving) {
           if (!t.lowSpeedSinceTs) t.lowSpeedSinceTs = now;
@@ -167,12 +219,12 @@ export default function RunTracker({ darkMode }) {
         }
       }
 
-      const isMoving = statusRef.current === "active" && !t.autoPaused;
-      t.curSpeedMps = curSpeed;
+      const isMoving = statusRef.current === "active" && moving;
+      t.curSpeedMps = moving ? curSpeed : 0;
 
       if (isMoving) {
-        t.distanceM += dM;
-        t.movingMs += dt * 1000;
+        t.distanceM += moveDistanceM;
+        t.movingMs += moveDurationS * 1000;
         if (curSpeed > t.maxSpeedMps) t.maxSpeedMps = curSpeed;
         t.points.push(point);
 

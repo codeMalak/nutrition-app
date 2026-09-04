@@ -9,7 +9,12 @@ export const KM_METERS = 1000;
 export const MAX_ACCURACY_M = 30;        // discard fixes worse than this
 export const MAX_PLAUSIBLE_SPEED_MPS = 12; // ~27mph — beyond this treat as a GPS jump
 export const LOW_SPEED_MPS = 0.5;         // ~1.1mph — below this counts as "stopped"
-export const AUTO_PAUSE_MS = 8000;        // sustained low speed before auto-pausing
+export const MIN_DISTANCE_DELTA_M = 2;    // ignore displacement smaller than this — GPS jitter
+                                           // at a standstill can otherwise read as "moving"
+export const MAX_POSITION_AGE_MS = 30000; // reject a fix this stale — likely a cached
+                                           // "last known location", not a live one
+export const AUTO_PAUSE_MS = 8000;        // sustained low speed before showing "Auto-paused"
+                                           // (cosmetic only — doesn't gate what's recorded)
 
 export function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -65,11 +70,17 @@ export function formatDuration(totalSeconds) {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-// seconds-per-unit pace, formatted as M:SS
+// seconds-per-unit pace, formatted as M:SS. Anything above 60 min/unit isn't
+// a meaningful pace to show — a last-resort display-layer guard alongside
+// the tracking-side fixes, since dividing by a near-zero distance is
+// inherently unstable in the first few seconds of a run.
 export function formatPace(secondsPerUnit) {
-  if (!isFinite(secondsPerUnit) || secondsPerUnit <= 0) return "--:--";
-  const m = Math.floor(secondsPerUnit / 60);
-  const s = Math.round(secondsPerUnit % 60);
+  if (!isFinite(secondsPerUnit) || secondsPerUnit <= 0 || secondsPerUnit > 3600) return "--:--";
+  // Round the total once, then split — rounding minutes and seconds
+  // independently can overflow (e.g. "28:60" instead of "29:00").
+  const total = Math.round(secondsPerUnit);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
