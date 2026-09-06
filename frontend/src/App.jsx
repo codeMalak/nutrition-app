@@ -5,20 +5,26 @@ import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
+import { isTokenValid } from "./utils/auth";
+
+// A present-but-expired/malformed token shouldn't render the dashboard shell
+// (its API calls would just fail silently in the background) — treat it as
+// logged-out, and clean it up while we're at it.
+function getValidToken() {
+  const stored = localStorage.getItem("token");
+  if (stored && isTokenValid(stored)) return stored;
+  if (stored) localStorage.removeItem("token");
+  return null;
+}
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [token, setToken] = useState(getValidToken());
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("theme");
     if (saved) return saved === "dark";
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-
-  useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    setToken(storedToken);
-  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -37,9 +43,12 @@ function App() {
     <Routes>
       <Route
         path="/"
-        element={token ? <Navigate to="/dashboard" /> : <LoginPage setToken={setToken} />}
+        element={token ? <Navigate to="/dashboard" replace /> : <LoginPage setToken={setToken} />}
       />
-      <Route path="/login" element={<LoginPage setToken={setToken} />} />
+      <Route
+        path="/login"
+        element={token ? <Navigate to="/dashboard" replace /> : <LoginPage setToken={setToken} />}
+      />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/payment-success" element={<PaymentSuccessPage />} />
@@ -53,7 +62,7 @@ function App() {
               darkMode={darkMode}
             />
           ) : (
-            <Navigate to="/login" />
+            <Navigate to="/login" replace />
           )
         }
       />

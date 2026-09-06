@@ -5,6 +5,22 @@ const BASE = window.location.protocol === "capacitor:"
   ? "https://www.leanhostzone.com"
   : "";
 
+// Catches a token the backend rejects for any reason not visible client-side
+// (secret rotation, account deleted, etc.) — the client-side expiry check in
+// utils/auth.js only catches the token's own declared expiry. Either way,
+// nothing should keep rendering an authenticated page with a token that
+// doesn't actually authenticate.
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && window.location.pathname !== "/login") {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
 const getConfig = () => ({
   headers: { Authorization: localStorage.getItem("token") },
 });
