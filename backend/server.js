@@ -16,6 +16,12 @@ const runningRoutes = require("./routes/running");
 
 const app = express();
 
+// nginx sits in front of this app — trust its X-Forwarded-* headers for
+// exactly one hop so req.ip is the real client IP, not nginx's. Needed for
+// the rate limiter on auth routes to key off individual visitors instead of
+// treating every request as coming from the same proxy IP.
+app.set("trust proxy", 1);
+
 app.use(cors({
   origin: [
     "http://localhost:5173",

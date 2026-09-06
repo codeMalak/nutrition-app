@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../api";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, MailCheck } from "lucide-react";
 import NutriIcon from "../components/NutriIcon";
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
   const [form, setForm]       = useState({ email: "", password: "", confirm: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState(false);
+  const [resent, setResent]   = useState(false);
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,11 +21,24 @@ export default function RegisterPage() {
     try {
       await api.register({ email: form.email, password: form.password });
       setSuccess(true);
-      setTimeout(() => navigate("/login"), 2500);
     } catch (err) {
       setError(err.response?.data?.error || "Registration failed. Try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await api.resendVerification(form.email);
+      setResent(true);
+      setTimeout(() => setResent(false), 4000);
+    } catch {
+      // resend-verification never reveals whether an email exists, so this
+      // only fails on something like a rate limit — nothing useful to show
+    } finally {
+      setResending(false);
     }
   };
 
@@ -37,17 +51,28 @@ export default function RegisterPage() {
         <div className="w-full max-w-[360px] text-center">
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl shadow-slate-200/60 dark:shadow-none border border-slate-100 dark:border-slate-700 p-8">
             <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-400" />
+              <MailCheck size={28} className="text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Account created!</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
-              Redirecting you to sign in…
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Check your email</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
+              We sent a verification link to
             </p>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-5">{form.email}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-5">
+              Click it to finish creating your account — it expires in 24 hours.
+            </p>
+            <button
+              onClick={handleResend}
+              disabled={resending || resent}
+              className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-60 mb-3"
+            >
+              {resent ? "Email sent!" : resending ? "Sending…" : "Resend email"}
+            </button>
             <Link
               to="/login"
-              className="inline-block bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors"
+              className="block text-sm text-indigo-600 dark:text-indigo-400 font-semibold hover:text-indigo-700 dark:hover:text-indigo-300"
             >
-              Sign in now
+              Back to sign in
             </Link>
           </div>
         </div>

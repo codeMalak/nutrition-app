@@ -3,10 +3,23 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const rateLimit = require("express-rate-limit");
 const User = require("../models/User");
+const PendingSignup = require("../models/PendingSignup");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
+
+// Limits how fast someone can trigger a verification email — protects
+// against a script mass-registering accounts, and against someone using
+// the endpoint to spam a real victim's inbox with repeated emails.
+const emailRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please wait a while and try again." },
+});
 
 function createTransporter() {
   return nodemailer.createTransport({
@@ -52,67 +65,87 @@ async function sendVerificationEmail(email, token) {
   ]);
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", emailRequestLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "An account with this email already exists." });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await User.create({
-      email,
-      password: hashedPassword,
-      emailVerified: false,
-      emailVerificationToken: verificationToken,
-      emailVerificationExpires: expires,
-    });
+    // No User is created yet — just a pending signup. A repeat attempt for
+    // the same still-unverified email simply refreshes the token/expiry
+    // (upsert) rather than erroring, so someone who never got the first
+    // email — or let it expire — can just try again.
+    await PendingSignup.findOneAndUpdate(
+      { email },
+      { email, password: hashedPassword, token: verificationToken, expiresAt },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     // Fire email but don't let it block or hang the response
     sendVerificationEmail(email, verificationToken).catch((err) => {
       console.error(`[EMAIL ERROR] ${err.message}`);
     });
 
-    res.json({ message: "Account created. Please check your email to verify your account." });
+    res.json({ message: "Check your email to verify your address and finish creating your account." });
   } catch (err) {
-    res.status(400).json({ error: "User already exists" });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/verify/:token", async (req, res) => {
   try {
-    const user = await User.findOne({
-      emailVerificationToken: req.params.token,
-      emailVerificationExpires: { $gt: new Date() },
+    const pending = await PendingSignup.findOne({
+      token: req.params.token,
+      expiresAt: { $gt: new Date() },
     });
 
-    if (!user) {
-      return res.status(400).json({ error: "Invalid or expired verification link." });
+    if (!pending) {
+      return res.status(400).json({ error: "Invalid or expired verification link. Please sign up again." });
     }
 
-    user.emailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save();
+    // Extremely unlikely, but guard against a duplicate-key crash rather
+    // than a raw 500 if this email became a real account in the meantime.
+    const existingUser = await User.findOne({ email: pending.email });
+    if (existingUser) {
+      await PendingSignup.deleteOne({ _id: pending._id });
+      return res.status(400).json({ error: "An account with this email already exists." });
+    }
+
+    await User.create({
+      email: pending.email,
+      password: pending.password, // already hashed
+      emailVerified: true,
+    });
+    await PendingSignup.deleteOne({ _id: pending._id });
 
     res.json({ message: "Email verified! You can now log in." });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-router.post("/resend-verification", async (req, res) => {
+router.post("/resend-verification", emailRequestLimiter, async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email, emailVerified: false });
+    const pending = await PendingSignup.findOne({ email });
 
-    if (!user) {
-      return res.json({ message: "If that account exists and is unverified, a new email has been sent." });
+    if (!pending) {
+      return res.json({ message: "If a pending signup exists for that email, a new verification email has been sent." });
     }
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    user.emailVerificationToken = verificationToken;
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await user.save();
+    pending.token = verificationToken;
+    pending.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pending.save();
 
     sendVerificationEmail(email, verificationToken).catch((err) => {
       console.error(`[EMAIL ERROR] ${err.message}`);

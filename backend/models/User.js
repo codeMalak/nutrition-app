@@ -9,9 +9,10 @@ const userSchema = new mongoose.Schema({
     fats: { type: Number, default: 70 },
     carbs: { type: Number, default: 200 }
   },
-  emailVerified: { type: Boolean, default: false },
-  emailVerificationToken: { type: String },
-  emailVerificationExpires: { type: Date },
+  // Every User is created only after verifying email ownership (see
+  // PendingSignup) — this stays around for pre-existing accounts from
+  // before that was true, and for reference, but nothing gates on it.
+  emailVerified: { type: Boolean, default: true },
   isPremium: { type: Boolean, default: false }
 });
 
