@@ -36,6 +36,14 @@ function createTransporter() {
   });
 }
 
+// The From address is a real mailbox on a domain you've verified with your
+// email provider — it is NOT the same thing as SMTP_USER (which, for a
+// provider like Resend, is a fixed literal like "resend", not an email
+// address at all, and would produce an invalid From header if reused here).
+// Set EMAIL_FROM in .env; SMTP_USER is only a fallback for a provider (like
+// the old Gmail setup) where the SMTP username genuinely was the sender.
+const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.SMTP_USER;
+
 async function sendVerificationEmail(email, token) {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
 
@@ -45,7 +53,7 @@ async function sendVerificationEmail(email, token) {
   const transporter = createTransporter();
   await Promise.race([
     transporter.sendMail({
-      from: `"NutriTrack" <${process.env.SMTP_USER}>`,
+      from: `"NutriTrack" <${FROM_ADDRESS}>`,
       to: email,
       subject: "Verify your NutriTrack account",
       html: `
@@ -211,7 +219,7 @@ router.post("/test-email", async (req, res) => {
     const transporter = createTransporter();
     await transporter.verify();
     await transporter.sendMail({
-      from: `"NutriTrack Test" <${process.env.SMTP_USER}>`,
+      from: `"NutriTrack Test" <${FROM_ADDRESS}>`,
       to,
       subject: "NutriTrack SMTP Test",
       text: "If you received this, your SMTP config is working correctly.",
