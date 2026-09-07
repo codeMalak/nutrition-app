@@ -2,13 +2,24 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const rateLimit = require("express-rate-limit");
 const User = require("../models/User");
 const PendingSignup = require("../models/PendingSignup");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
+
+// Resend's HTTP API (plain HTTPS, port 443) rather than SMTP — many cheap
+// VPS hosts (this app's included, on DigitalOcean) block outbound SMTP
+// ports 25/465/587 by default as an anti-spam measure, which an SMTP
+// transport would hit as a connection timeout no matter how correct the
+// credentials/DNS are. HTTPS out to Resend's API is never affected by that.
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// The From address is a real mailbox on a domain you've verified with
+// Resend — set EMAIL_FROM in .env.
+const FROM_ADDRESS = process.env.EMAIL_FROM;
 
 // Limits how fast someone can trigger a verification email — protects
 // against a script mass-registering accounts, and against someone using
@@ -21,56 +32,29 @@ const emailRequestLimiter = rateLimit({
   message: { error: "Too many attempts. Please wait a while and try again." },
 });
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    connectionTimeout: 6000,
-    greetingTimeout: 6000,
-    socketTimeout: 10000,
-  });
-}
-
-// The From address is a real mailbox on a domain you've verified with your
-// email provider — it is NOT the same thing as SMTP_USER (which, for a
-// provider like Resend, is a fixed literal like "resend", not an email
-// address at all, and would produce an invalid From header if reused here).
-// Set EMAIL_FROM in .env; SMTP_USER is only a fallback for a provider (like
-// the old Gmail setup) where the SMTP username genuinely was the sender.
-const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.SMTP_USER;
-
 async function sendVerificationEmail(email, token) {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
 
   // Always log the link so the server console works as a fallback
   console.log(`[VERIFY] Link for ${email}: ${verifyUrl}`);
 
-  const transporter = createTransporter();
-  await Promise.race([
-    transporter.sendMail({
-      from: `"NutriTrack" <${FROM_ADDRESS}>`,
-      to: email,
-      subject: "Verify your NutriTrack account",
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-          <h2 style="color:#4f46e5;margin-bottom:8px">Welcome to NutriTrack!</h2>
-          <p style="color:#374151;margin-bottom:24px">Click the button below to verify your email address. The link expires in 24 hours.</p>
-          <a href="${verifyUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px">
-            Verify Email
-          </a>
-          <p style="color:#9ca3af;font-size:13px;margin-top:24px">If you didn't create a NutriTrack account you can safely ignore this email.</p>
-        </div>
-      `,
-    }),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Email timed out after 10s")), 10000)
-    ),
-  ]);
+  const { error } = await resend.emails.send({
+    from: `NutriTrack <${FROM_ADDRESS}>`,
+    to: email,
+    subject: "Verify your NutriTrack account",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+        <h2 style="color:#4f46e5;margin-bottom:8px">Welcome to NutriTrack!</h2>
+        <p style="color:#374151;margin-bottom:24px">Click the button below to verify your email address. The link expires in 24 hours.</p>
+        <a href="${verifyUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px">
+          Verify Email
+        </a>
+        <p style="color:#9ca3af;font-size:13px;margin-top:24px">If you didn't create a NutriTrack account you can safely ignore this email.</p>
+      </div>
+    `,
+  });
+
+  if (error) throw new Error(error.message || JSON.stringify(error));
 }
 
 router.post("/register", emailRequestLimiter, async (req, res) => {
@@ -216,14 +200,13 @@ router.post("/test-email", async (req, res) => {
   const { to } = req.body;
   if (!to) return res.status(400).json({ error: "Provide a 'to' email address" });
   try {
-    const transporter = createTransporter();
-    await transporter.verify();
-    await transporter.sendMail({
-      from: `"NutriTrack Test" <${FROM_ADDRESS}>`,
+    const { error } = await resend.emails.send({
+      from: `NutriTrack Test <${FROM_ADDRESS}>`,
       to,
-      subject: "NutriTrack SMTP Test",
-      text: "If you received this, your SMTP config is working correctly.",
+      subject: "NutriTrack Email Test",
+      text: "If you received this, your Resend config is working correctly.",
     });
+    if (error) throw new Error(error.message || JSON.stringify(error));
     res.json({ success: true, message: `Test email sent to ${to}` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

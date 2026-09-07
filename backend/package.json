@@ -20,7 +20,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.577.0",
     "mongoose": "^9.2.2",
-    "nodemailer": "^8.0.10",
+    "resend": "^4.8.0",
     "stripe": "^22.2.0"
   }
 }
